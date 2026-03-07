@@ -1,6 +1,6 @@
 # CML — C Machine Learning Library
 
-A minimal, educational machine learning library written in **pure C99**. Built from scratch across 7 iterations, covering linear algebra, activations, loss functions, optimization, and full ML models up to neural networks.
+A minimal, educational machine learning library written in **pure C99**. Built from scratch, covering linear algebra, activations, loss functions, optimization, and full ML models up to neural networks.
 
 ---
 
