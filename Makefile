@@ -60,3 +60,6 @@ nn_demo: $(OBJECTS) $(EX_DIR)/neural_network_demo.c
 
 clean:
 	rm -rf $(OBJ_DIR) demo train_lr train_logistic nn_demo
+
+test_titanic_c: $(OBJ_DIR) $(OBJECTS) $(EX_DIR)/titanic_logistic.c
+	$(CC) $(CFLAGS) $(OBJECTS) $(EX_DIR)/titanic_logistic.c -o test_titanic_c $(LIBS)
