@@ -2,3 +2,5 @@
 build/
 demo
 train_lr
+train_logistic
+nn_demo
