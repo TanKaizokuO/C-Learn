@@ -7,7 +7,7 @@ A minimal, educational machine learning library written in **pure C99**. Built f
 ## Project Structure
 
 ```
-cml/
+C-Learn/
 ├── include/
 │   ├── matrix.h               # Core matrix struct + all ops
 │   ├── activations.h          # relu, sigmoid
@@ -34,7 +34,6 @@ cml/
 ## Build
 
 ```bash
-cd cml
 make          # builds both: demo and train_lr
 make demo     # Iterations 1–4 only
 make train_lr # Iteration 5 only
