@@ -1,4 +1,4 @@
-# CML — A Machine Learning Library in Pure C
+# C-Learn — A Machine Learning Library in Pure C
 
 > A lightweight, educational machine learning framework built from scratch in **pure C99** — no external ML dependencies, no black boxes.
 
