@@ -7,3 +7,6 @@ nn_demo
 test_runner
 test_titanic_c
 titanic_logistic
+
+# Scratch working area (local issue tracker / planning notes)
+.scratch/
