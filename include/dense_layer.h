@@ -50,6 +50,40 @@ void free_dense_layer(DenseLayer *layer);
 Matrix forward_dense(DenseLayer *layer, Matrix X);
 
 /* ─────────────────────────────────────────────
+ * Backward Pass
+ * ───────────────────────────────────────────── */
+
+/*
+ * DenseGradients — Gradients produced by one layer's backward pass.
+ *
+ *   dW : (input_size × output_size), same shape as layer.weights
+ *   db : (1 × output_size),          same shape as layer.bias
+ *   dX : (n_samples × input_size),   gradient to propagate to the
+ *        previous layer; same shape as this layer's forward input X
+ */
+typedef struct {
+  Matrix dW;
+  Matrix db;
+  Matrix dX;
+} DenseGradients;
+
+/* Free every matrix held by a DenseGradients struct. */
+void free_dense_gradients(DenseGradients *grads);
+
+/*
+ * backward_dense — Gradients of a dense layer, given dZ = dL/dZ.
+ *
+ *   dW = Xᵀ · dZ
+ *   db = column-sum of dZ over samples
+ *   dX = dZ · Wᵀ
+ *
+ * X is the same input this layer's forward_dense was called with.
+ * Pure — does not mutate layer or X. Caller must free all three
+ * fields of the returned struct.
+ */
+DenseGradients backward_dense(DenseLayer *layer, Matrix X, Matrix dZ);
+
+/* ─────────────────────────────────────────────
  * Activation Helper
  * ───────────────────────────────────────────── */
 

@@ -6,6 +6,7 @@
 #   make train_lr     → Iteration 5: Linear Regression
 #   make train_logistic → Iteration 6: Logistic Regression
 #   make nn_demo      → Iteration 7: Neural Network
+#   make test         → build and run the test suite (test_runner)
 #   make clean        → remove compiled objects and binaries
 #
 
@@ -17,6 +18,7 @@ SRC_DIR  = src
 INC_DIR  = include
 EX_DIR   = examples
 OBJ_DIR  = build
+TEST_DIR = tests
 
 SOURCES  = $(SRC_DIR)/matrix.c              \
            $(SRC_DIR)/activations.c          \
@@ -29,9 +31,11 @@ SOURCES  = $(SRC_DIR)/matrix.c              \
 
 OBJECTS  = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SOURCES))
 
+TEST_SOURCES = $(wildcard $(TEST_DIR)/*.c)
+
 TARGETS  = demo train_lr train_logistic nn_demo
 
-.PHONY: all clean
+.PHONY: all clean test
 
 all: $(OBJ_DIR) $(TARGETS)
 
@@ -59,7 +63,13 @@ nn_demo: $(OBJECTS) $(EX_DIR)/neural_network_demo.c
 	$(CC) $(CFLAGS) $(OBJECTS) $(EX_DIR)/neural_network_demo.c -o nn_demo $(LIBS)
 
 clean:
-	rm -rf $(OBJ_DIR) demo train_lr train_logistic nn_demo
+	rm -rf $(OBJ_DIR) demo train_lr train_logistic nn_demo test_runner
 
 test_titanic_c: $(OBJ_DIR) $(OBJECTS) $(EX_DIR)/titanic_logistic.c
 	$(CC) $(CFLAGS) $(OBJECTS) $(EX_DIR)/titanic_logistic.c -o test_titanic_c $(LIBS)
+
+# Test suite — builds one test_runner binary linking $(OBJECTS) against
+# every tests/*.c file, then runs it.
+test: $(OBJ_DIR) $(OBJECTS) $(TEST_SOURCES)
+	$(CC) $(CFLAGS) -I$(TEST_DIR) $(OBJECTS) $(TEST_SOURCES) -o test_runner $(LIBS)
+	./test_runner

@@ -1,5 +1,5 @@
 /*
- * neural_network_demo.c — Neural Network Forward Pass Demo
+ * neural_network_demo.c — Neural Network Forward Pass + Training Demo
  *
  * Iteration 7: Demonstrates the two-layer feedforward network.
  *
@@ -10,17 +10,18 @@
  *   2. Inspecting layer dimensions
  *   3. Forward pass on a batch of random inputs
  *   4. Forward pass on a single hand-crafted input
- *   5. Memory cleanup
- *
- * Note: Full training (backpropagation) is a planned future iteration.
+ *   5. Training on a synthetic linearly-separable dataset
+ *   6. Memory cleanup
  */
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
 #include "activations.h"
 #include "dense_layer.h"
+#include "loss.h"
 #include "matrix.h"
 #include "neural_network.h"
 
@@ -29,6 +30,9 @@
 #define HIDDEN_SIZE 16
 #define OUTPUT_SIZE 1
 #define BATCH_SIZE 5
+#define TRAIN_SAMPLES 40
+#define TRAIN_EPOCHS 500
+#define LEARNING_RATE 0.5f
 
 int main(void) {
   srand((unsigned int)time(NULL));
@@ -121,15 +125,51 @@ int main(void) {
   free_matrix(&x_single);
 
   /* ────────────────────────────────────────────
-   * 5. Cleanup
+   * 5. Train on a synthetic linearly-separable dataset
+   * ──────────────────────────────────────────── */
+  printf("══════════════════════════════════════════\n");
+  printf("  Training  (%d samples, %d epochs)\n", TRAIN_SAMPLES,
+         TRAIN_EPOCHS);
+  printf("══════════════════════════════════════════\n");
+
+  /* Deterministic features (no RNG) so demo output is reproducible;
+   * the label is the sign of a linear combination of the features,
+   * making the dataset linearly separable by construction. */
+  Matrix X_train = create_matrix(TRAIN_SAMPLES, INPUT_SIZE);
+  Matrix y_train = create_matrix(TRAIN_SAMPLES, OUTPUT_SIZE);
+  for (int i = 0; i < TRAIN_SAMPLES; i++) {
+    float score = 0.0f;
+    for (int j = 0; j < INPUT_SIZE; j++) {
+      float x = sinf((float)i * 0.37f + (float)j * 0.91f);
+      X_train.data[i * INPUT_SIZE + j] = x;
+      score += (j % 2 == 0 ? x : -x);
+    }
+    y_train.data[i] = score > 0.0f ? 1.0f : 0.0f;
+  }
+
+  Matrix pre_train_pred = forward_network(&net, X_train);
+  float pre_train_loss = binary_cross_entropy(y_train, pre_train_pred);
+  free_matrix(&pre_train_pred);
+  printf("  Loss before training: %.6f\n\n", pre_train_loss);
+
+  train_network(&net, X_train, y_train, TRAIN_EPOCHS, LEARNING_RATE);
+
+  Matrix post_train_pred = forward_network(&net, X_train);
+  float post_train_loss = binary_cross_entropy(y_train, post_train_pred);
+  free_matrix(&post_train_pred);
+  printf("  Loss after training:  %.6f\n\n", post_train_loss);
+
+  free_matrix(&X_train);
+  free_matrix(&y_train);
+
+  /* ────────────────────────────────────────────
+   * 6. Cleanup
    * ──────────────────────────────────────────── */
   free_network(&net);
 
   printf("══════════════════════════════════════════\n");
-  printf("  Forward pass complete. Memory freed.\n");
+  printf("  Demo complete. Memory freed.\n");
   printf("══════════════════════════════════════════\n\n");
-  printf("  Note: Backpropagation training is a\n");
-  printf("  planned future iteration.\n\n");
 
   return 0;
 }

@@ -13,4 +13,16 @@ float relu(float x);
 /* Logistic sigmoid: 1 / (1 + exp(-x)) */
 float sigmoid(float x);
 
+/*
+ * relu_derivative — d/dz relu(z), evaluated at the pre-activation z.
+ * Returns 1 if z > 0, otherwise 0.
+ */
+float relu_derivative(float z);
+
+/*
+ * sigmoid_derivative — d/dz sigmoid(z), evaluated at the pre-activation z.
+ *   sigmoid'(z) = sigmoid(z) * (1 - sigmoid(z))
+ */
+float sigmoid_derivative(float z);
+
 #endif /* ACTIVATIONS_H */

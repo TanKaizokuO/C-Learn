@@ -27,3 +27,20 @@ float relu(float x) { return x > 0.0f ? x : 0.0f; }
  *   σ(x) = 1 / (1 + e^(-x))
  */
 float sigmoid(float x) { return 1.0f / (1.0f + expf(-x)); }
+
+/*
+ * relu_derivative — Derivative of relu, evaluated at the pre-activation z.
+ * relu is non-differentiable at z = 0; by convention we return 0 there.
+ */
+float relu_derivative(float z) { return z > 0.0f ? 1.0f : 0.0f; }
+
+/*
+ * sigmoid_derivative — Derivative of sigmoid, evaluated at the
+ * pre-activation z.
+ *
+ *   sigmoid'(z) = sigmoid(z) * (1 - sigmoid(z))
+ */
+float sigmoid_derivative(float z) {
+  float s = sigmoid(z);
+  return s * (1.0f - s);
+}

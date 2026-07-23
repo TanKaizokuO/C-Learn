@@ -65,6 +65,55 @@ Matrix forward_dense(DenseLayer *layer, Matrix X) {
 }
 
 /* ─────────────────────────────────────────────
+ * Backward Pass
+ * ───────────────────────────────────────────── */
+
+/*
+ * sum_rows — Sum a matrix's rows into a single (1 × cols) row.
+ * Used for the bias gradient: bias is broadcast to every sample row
+ * on the forward pass, so its gradient is the sum across rows.
+ */
+static Matrix sum_rows(Matrix m) {
+  Matrix result = zeros(1, m.cols);
+  for (int i = 0; i < m.rows; i++)
+    for (int j = 0; j < m.cols; j++)
+      result.data[j] += m.data[i * m.cols + j];
+  return result;
+}
+
+/*
+ * backward_dense — Gradients of Z = X·W + b w.r.t. W, b, and X.
+ *
+ *   dW = Xᵀ · dZ    (input_size × output_size)
+ *   db = Σ_rows dZ  (1 × output_size)
+ *   dX = dZ · Wᵀ    (n_samples × input_size)
+ */
+DenseGradients backward_dense(DenseLayer *layer, Matrix X, Matrix dZ) {
+  Matrix Xt = transpose(X);
+  Matrix dW = matmul(Xt, dZ);
+  free_matrix(&Xt);
+
+  Matrix db = sum_rows(dZ);
+
+  Matrix Wt = transpose(layer->weights);
+  Matrix dX = matmul(dZ, Wt);
+  free_matrix(&Wt);
+
+  DenseGradients grads;
+  grads.dW = dW;
+  grads.db = db;
+  grads.dX = dX;
+  return grads;
+}
+
+/* free_dense_gradients — Release every matrix held by a DenseGradients. */
+void free_dense_gradients(DenseGradients *grads) {
+  free_matrix(&grads->dW);
+  free_matrix(&grads->db);
+  free_matrix(&grads->dX);
+}
+
+/* ─────────────────────────────────────────────
  * Activation Helper
  * ───────────────────────────────────────────── */
 
