@@ -16,7 +16,7 @@ Most ML frameworks abstract away the internals behind high-level APIs. CML does 
 *   **Iterative architecture** — each layer of the stack builds directly on the previous one.
 *   **Memory-transparent** — explicit allocation and deallocation throughout; no hidden heap usage.
 
-The library grows the ML stack from the ground up across 7 self-contained iterations, starting from a matrix struct and ending at a two-layer neural network.
+The library grows the ML stack from the ground up across 7 self-contained iterations, starting from a matrix struct and ending at a two-layer neural network trained end-to-end via backpropagation.
 
 ---
 
@@ -31,8 +31,10 @@ The library grows the ML stack from the ground up across 7 self-contained iterat
 | **Optimizer** | Gradient Descent — in-place parameter update |
 | **Linear Regression** | $y = XW + b$ — trained with MSE + gradient descent |
 | **Logistic Regression** | $y = \sigma(XW + b)$ — binary classification with BCE loss |
-| **Dense Layer** | Fully-connected layer with weight + bias, forward pass |
-| **Neural Network** | Two-layer feedforward net: $\text{Input} \to \text{Dense} \to \text{ReLU} \to \text{Dense} \to \text{Sigmoid}$ |
+| **Dense Layer** | Fully-connected layer with weight + bias, forward **and backward** pass |
+| **Neural Network** | Two-layer feedforward net, trained end-to-end via backpropagation |
+| **Gradient Checking** | Numerical gradient checker validates every analytic gradient against `(L(w+ε) - L(w-ε)) / 2ε` |
+| **Test Suite** | Hand-rolled, zero-dependency test harness — characterization tests for every module plus gradient checking |
 
 ---
 
@@ -179,7 +181,48 @@ Z2 = forward_dense(&net.layer2, A1);   /* linear:  Hidden → Output */
 A2 = apply_activation(Z2, sigmoid);    /* output probability       */
 ```
 
-> 📌 **Roadmap:** Backpropagation and training loop for the neural network are planned as a future iteration.
+#### Backpropagation
+
+Training needs the forward pass's intermediates, so a training-only variant keeps everything the backward pass needs instead of freeing it:
+
+```c
+ForwardCache cache = forward_network_cached(&net, X);   /* { Z1, A1, Z2, A2 } */
+Gradients grads = backward_network(&net, cache, X, y);  /* { dW1, db1, dW2, db2 } */
+```
+
+`backward_network` is a **pure function** — it computes gradients only, never mutates the network. The output layer uses the fused BCE+sigmoid shortcut $dZ_2 = A_2 - y$ (numerically stable — see [ADR-0001](docs/adr/0001-fused-sigmoid-bce-gradient.md)) rather than chaining a separately computed loss derivative through `sigmoid_derivative`. The hidden layer has no such shortcut, so it chains through the real `relu_derivative(Z1)`:
+
+```c
+dZ2 = A2 - y                                    /* fused output-layer gradient  */
+dW2, db2, dA1 = backward_dense(layer2, A1, dZ2)
+dZ1 = dA1 ⊙ relu_derivative(Z1)                 /* chained hidden-layer gradient */
+dW1, db1, _   = backward_dense(layer1, X, dZ1)
+```
+
+Because it's pure, `backward_network` is directly gradient-checkable — `tests/test_gradients.c` numerically verifies every one of a network's parameters against `(L(w+ε) - L(w-ε)) / 2ε` before anything trusts it.
+
+#### Training
+
+`train_network` wires the pieces together: forward (cached) → backward → gradient descent, once per parameter, every epoch.
+
+```c
+NeuralNetwork net = create_network(input_size, hidden_size, output_size);
+train_network(&net, X, y, epochs, learning_rate);
+free_network(&net);
+```
+
+Sample output from `make nn_demo`:
+
+```
+Training Neural Network...
+
+Epoch    1 | Loss: 0.795222
+Epoch  100 | Loss: 0.011663
+Epoch  200 | Loss: 0.004998
+Epoch  300 | Loss: 0.002975
+Epoch  400 | Loss: 0.002054
+Epoch  500 | Loss: 0.001542
+```
 
 ---
 
@@ -223,6 +266,38 @@ Execution time: 0.07906 seconds
 
 ---
 
+## 🧪 Testing
+
+A hand-rolled, zero-dependency test harness (`tests/test_utils.h`) provides `ASSERT_TRUE`/`ASSERT_FLOAT_NEAR`, recording failures into a shared counter instead of aborting so one failing assertion doesn't hide the rest of the suite.
+
+```bash
+make test
+```
+
+| File | Covers |
+| :--- | :--- |
+| `test_matrix.c` | `matmul`, `transpose`, `add`/`subtract`, element-wise ops, `dot_product` against known values |
+| `test_loss.c` | `mse`, `binary_cross_entropy`, and the BCE log(0) clamp at both boundaries |
+| `test_activations.c` | `relu`, `sigmoid`, and their derivatives (including the `z = 0` boundary) |
+| `test_gradients.c` | Numerical gradient checking of `backward_network` — every parameter of a 3-4-1 network, checked against `(L(w+ε) - L(w-ε)) / 2ε` |
+| `test_training.c` | Integration test proving `train_network` actually reduces loss over time |
+
+```
+Running C-Learn test suite...
+
+-- Matrix core tests --
+-- Loss tests --
+-- Activation tests --
+-- Gradient checking tests --
+-- Training loop integration test --
+
+66 passed, 0 failed
+```
+
+`make test` exits nonzero if any assertion fails, so it's CI-friendly.
+
+---
+
 ## 📁 Project Structure
 
 ```
@@ -253,7 +328,20 @@ C-Learn/
 │   ├── train_linear_regression.c     ← Linear Regression sample training
 │   ├── train_logistic.c              ← Synthetic Logistic Regression training
 │   ├── titanic_logistic.c            ← Real-world Titanic survival training
-│   └── neural_network_demo.c         ← Neural Network forward pass demo
+│   └── neural_network_demo.c         ← Neural Network forward pass + training demo
+│
+├── tests/
+│   ├── test_utils.h                  ← ASSERT_TRUE / ASSERT_FLOAT_NEAR harness
+│   ├── main.c                        ← Test runner — calls each run_*_tests()
+│   ├── test_matrix.c
+│   ├── test_loss.c
+│   ├── test_activations.c
+│   ├── test_gradients.c              ← Numerical gradient checking
+│   └── test_training.c               ← Training-loop integration test
+│
+├── docs/
+│   └── adr/
+│       └── 0001-fused-sigmoid-bce-gradient.md
 │
 ├── Makefile
 ├── Titanic-Dataset.csv               ← Raw Kaggle Titanic dataset
@@ -277,7 +365,8 @@ make demo           # Iterations 1–4 showcase
 make train_lr       # Linear Regression demo
 make train_logistic # Synthetic Logistic Regression demo
 make test_titanic_c # Titanic Survival Classifier (real data)
-make nn_demo        # Neural Network forward pass demo
+make nn_demo        # Neural Network forward pass + training demo
+make test           # Build and run the test suite
 
 # Remove build artifacts
 make clean
@@ -299,15 +388,16 @@ gcc -std=c99 -Wall -Wextra -Iinclude src/*.c examples/titanic_logistic.c -o test
 *   **Dimension validation:** Matrix sizes are validated before execution to prevent out-of-bound errors.
 *   **Warning-free:** Compiles cleanly with `-Wall -Wextra`.
 *   **Stateless design:** All model parameters live in explicitly managed structs passed by reference.
+*   **Verified, not trusted:** Gradients are checked numerically (`tests/test_gradients.c`), not assumed correct from derivation alone; nontrivial trade-offs are recorded as ADRs (`docs/adr/`).
 
 ---
 
 ## 🤝 Contributing
 
 Contributions are welcome! If you want to expand CML, here are some great starting points:
-*   **Backpropagation:** Implement backprop and training for the `NeuralNetwork` struct.
 *   **New Models:** Add K-Nearest Neighbors (k-NN), Support Vector Machines (SVM), or Softmax Multi-class Regression.
-*   **Numerical Optimizations:** Cache-friendly multiplication, SIMD auto-vectorization friendly loops, or Adam optimizer.
+*   **Deeper Networks:** Generalize `NeuralNetwork` beyond two fixed layers to an arbitrary stack of `DenseLayer`s.
+*   **Numerical Optimizations:** Cache-friendly multiplication, SIMD auto-vectorization friendly loops, or an Adam/momentum optimizer.
 *   **More Data Pipelines:** Add parsing/training scripts for other classic datasets (e.g., MNIST).
 
 To contribute, fork the repository, make your changes in a feature branch, and open a pull request.
